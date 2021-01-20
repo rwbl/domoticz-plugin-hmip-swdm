@@ -1,4 +1,5 @@
 # Domoticz Plugin homematicIP Window and Door Contact with magnet (HMIP-SWDM)
+Version see Changelog.
 
 ## Objectives
 * To monitor the state open / close of windows and doors
