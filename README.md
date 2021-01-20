@@ -1,9 +1,9 @@
-# Domoticz Plugin homematicIP (HMIP-SWDM)
+# Domoticz Plugin homematicIP Window and Door Contact with magnet (HMIP-SWDM)
 
-# Objectives
+## Objectives
 * To monitor the state open / close of windows and doors
 
-_Abbreviations_: GUI=Domoticz Web UI, CCU=HomeMatic Central-Control-Unit
+![domoticz-plugin-hmip-swdm-o](https://user-images.githubusercontent.com/47274144/105165730-fe5f5200-5b16-11eb-834d-3a098f9361a0.png)
 
 ## Solution
 To monitor the state open / close of windows and doors the homematicIP Window and Door Contact with magnet (HMIP-SWDM) is used.
@@ -12,7 +12,8 @@ The homematic IP system used is a [RaspberryMatic](https://raspberrymatic.de/) o
 The CCU has the additional software XML-API CCU Addon installed.
 Communication between Domoticz and the CCU is via HTTP XML-API requests with HTTP XML response.
 
-In Domoticz, an Alert device shows the state closed (green) or open (red). The state is updated every 60 seconds (default).
+In **Domoticz**, an **Alert** device shows the state of the device closed (green) or open (red).
+The state is updated every 60 seconds (default, can be changed in the hardware settings).
 If required, further actions can defined, by for example creating a dzVents script to send a notification / email (see below "dzVents Example").
 
 ## Hardware
@@ -20,7 +21,7 @@ If required, further actions can defined, by for example creating a dzVents scri
 * homematicIP Window and Door Contact with magnet (HMIP-SWDM)
 
 ## Software
-Versions for developing & using this plugin.
+Versions (subject to change) for developing & using this plugin.
 * Raspberry Pi OS ( Raspbian GNU/Linux 10 buster, kernel 5.4.83-v7l+)
 * Domoticz 2020.2 (build 12847)
 * RaspberryMatic 3.55.5.20201226 [info](https://raspberrymatic.de/)
@@ -47,12 +48,12 @@ sudo pip3 install elementpath
 ## Installation Plugin
 
 ### Plugin Folder and File
-Each plugin requires a dedicated folder which contains the plugin, mandatory named plugin.py.
+Each plugin requires a dedicated folder which contains the plugin, mandatory named **plugin.py**.
 ``` 
 mkdir /home/pi/domoticz/plugins/hmip-swdm
 ``` 
 
-Copy plugin.py to the folder.
+Copy **plugin.py** to the folder hmip-swdm.
 
 ### Restart Domoticz
 ``` 
