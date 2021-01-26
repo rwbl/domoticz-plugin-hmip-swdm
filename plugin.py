@@ -1,40 +1,37 @@
 # Domoticz Home Automation - homematicIP Window and Door Contact with Magnet (HMIP-SWDM)
-# Get the state of the contact.
-# Dependencies
+# Get the state open|closed of the contact.
+# Dependencies:
+# RaspberryMatic XML-API CCU Addon (https://github.com/hobbyquaker/XML-API)
 # Library ElementTree (https://docs.python.org/3/library/xml.etree.elementtree.html#)
-# NOTE: after every change run
-# sudo service domoticz.sh restart
-# Domoticz Python Plugin Development Documentation:
-# https://www.domoticz.com/wiki/Developing_a_Python_plugin
+# Notes:
+# 1. After every change: delete the hardware using the plugin homematicIP Thermostat
+# 2. After every change: restart domoticz by running from terminal the command: sudo service domoticz.sh restart
+# 3. Domoticz Python Plugin Development Documentation (https://www.domoticz.com/wiki/Developing_a_Python_plugin)
+# 4. Only two adevice attributes are used. The plugin is flexible to add more attributes as required (examples LOW_BAT)
 #
 # Author: Robert W.B. Linn
 # Version: See plugin xml definition
 
 """
-<plugin key="HmIP-SWDM" name="homematicIP Window and Door Contact with Magnet (HmIP-SWDM)" author="rwbL" version="1.0.0 (Build 20210119)">
+<plugin key="HmIP-SWDM" name="homematicIP Window and Door Contact with Magnet (HmIP-SWDM)" author="rwbL" version="1.1.1 (Build 20210125)">
     <description>
-        <h2>homematicIP Window and Door Contact with Magnet (HmIP-SWDM) v1.0.0</h2>
+        <h2>homematicIP Window and Door Contact with Magnet (HmIP-SWDM) v1.1.1</h2>
         <ul style="list-style-type:square">
             <li>Get the state of the contact Open (1) or Closed (0).</li>
         </ul>
-        <h2>Domoticz Devices Name (TypeName)</h2>
+        <h3>Domoticz Devices (Type,SubType) [XML-API Device Datapoint Type]</h3>
         <ul style="list-style-type:square">
-            <li>State (General,Alert)</li>
+            <li>State (General,Alert) [STATE]</li>
         </ul>
-        <h2>Configuration</h2>
+        <h3>Configuration</h3>
         <ul style="list-style-type:square">
             <li>CCU IP address (default: 192.168.1.225)</li>
-            <li>IDs (obtained via XML-API script http://ccu-ip-address/addons/xmlapi/statelist.cgi using the HomeMatic WebUI Device Channel, i.e. HmIP-SWDM 001558A99D5A78:1:</li>
-            <ul style="list-style-type:square">
-                <li>Device ID HmIP-SWDM (default: 3597)</li>
-                <li>Datapoint ID STATE (default: 3622)</li>
-            </ul>
+            <li>Device ID (default: 3597, get via XML-API script http://ccu-ip-address/addons/xmlapi/statelist.cgi)</li>
         </ul>
     </description>
     <params>
         <param field="Address" label="CCU IP" width="200px" required="true" default="192.168.1.225"/>
-        <param field="Mode1" label="Device" width="75px" required="true" default="3597"/>
-        <param field="Mode2" label="Datapoint STATE" width="75px" required="true" default="3622"/>
+        <param field="Mode1" label="Device ID" width="75px" required="true" default="3597"/>
         <param field="Mode5" label="Check Interval (sec)" width="75px" required="true" default="60"/>
         <param field="Mode6" label="Debug" width="75px">
             <options>
@@ -47,8 +44,8 @@
 """
 
 # Set the plugin version
-PLUGINVERSION = "v1.0.0"
-PLUGINSHORTDESCRIPTON = "HmIP-SWDM"
+PLUGINVERSION = "v1.1.1"
+PLUGINSHORTDESCRIPTON = "HMIP-SWDM"
 
 ## Imports
 import Domoticz
@@ -59,13 +56,13 @@ import json
 import xml.etree.ElementTree as etree
 
 ## Domoticz device units used for creating & updating devices
-UNITSTATE = 1      # TypeName: Alert
+## And the RaspberryMatic XMLAPI datapoint type
+## Each of the devices have a self variable defined in function init
+UNIT_STATE = 1               # TypeName: Alert
+TYPE_STATE = "STATE"        
 
-# Index of the datapoints from the datapoints list
-# The datapoints are defined as a comma separated string in parameter Mode2
-# Syntax:DATAPOINTINDEX<Type> - without blanks or underscores
-DATAPOINTINDEXSTATE = 0
-# For enhanements add more like LOWBAT ...
+## For testing in debug mode only
+TYPE_OPERATING_VOLTAGE = "OPERATING_VOLTAGE"
 
 # User Messages - Change as required
 MSGSTATECLOSED = "Closed"
@@ -79,11 +76,9 @@ class BasePlugin:
         self.httpConn = None
         self.httpConnected = 0
 
-        # List of datapoints - state
-        self.DatapointsList = []
-
         # State as string as the datapoint value defined 
         self.State = "unknown"
+        self.OperatingVoltage = 0
         
         # The Domoticz heartbeat is set to every 60 seconds. Do not use a higher value as Domoticz message "Error: hardware (N) thread seems to have ended unexpectedly"
         # The Soil Moisture Monitor is read every Parameter.Mode5 seconds. This is determined by using a hearbeatcounter which is triggered by:
@@ -106,25 +101,14 @@ class BasePlugin:
         if (len(Devices) == 0):
             Domoticz.Debug("Creating new devices ...")
             ## 1 - STATE - TypeName: Alert (Type=243, Subtype=22)
-            Domoticz.Device(Name="State", Unit=UNITSTATE, Type=243, Subtype=22, Used=1).Create()
-            Devices[UNITSTATE].Update( nValue=1, sValue=MSGSTATECLOSED )
-            Domoticz.Debug("Device created: "+Devices[UNITSTATE].Name)
+            Domoticz.Device(Name="State", Unit=UNIT_STATE, Type=243, Subtype=22, Used=1).Create()
+            Devices[UNIT_STATE].Update( nValue=1, sValue=MSGSTATECLOSED )
+            Domoticz.Debug("Device created: "+Devices[UNIT_STATE].Name)
             Domoticz.Debug("Creating new devices: OK")
 
         # Heartbeat
         Domoticz.Debug("Heartbeat set: "+Parameters["Mode5"])
         Domoticz.Heartbeat(self.HeartbeatInterval)
-
-        # Create the datapoints list using the datapoints as defined in the parameter Mode2
-        ## The string contains multiple datapoints separated by comma (,). This enables to define more devices.
-        DatapointsParam = Parameters["Mode2"]
-        Domoticz.Debug("Datapoints:" + DatapointsParam)
-        ## Split the parameter string into a list of datapoints
-        self.DatapointsList = DatapointsParam.split(',')
-        # Check the list length (=1 because 1 datapoint required, i.e. state)
-        if len(self.DatapointsList) < 1:
-            ## Devices[UNITTEXTSTATUS].Update( nValue=0, sValue="[ERROR] UID parameter not correct! Should contain 5 UIDs." )
-            Domoticz.Error("[ERROR] Datapoints parameter not correct! Should contain 1 datapoint.")
         return
 
     def onStop(self):
@@ -158,7 +142,7 @@ class BasePlugin:
             return
         else:
             self.httpConnected = 0
-            Domoticz.Error("[ERROR]Failed to connect ("+str(Status)+") to: "+Parameters["Address"]+":"+Parameters["Port"]+" with error: "+Description)
+            Domoticz.Error("HTTP connection faillure ("+str(Status)+") to: "+Parameters["Address"]+":"+Parameters["Port"]+" with error: "+Description)
             return
 
     # Parse the http xml response and update the domoticz devices
@@ -179,27 +163,32 @@ class BasePlugin:
         ## Domoticz.Debug("DATA=" + responseData)
 
         if (responseStatus != 200):
-            Domoticz.Error("[ERROR] XML-API response: " + str(responseStatus) + ";" + resonseData)
+            Domoticz.Error("XML-API response faillure: " + str(responseStatus) + ";" + resonseData)
             return
 
         # Parse the xml string 
         # Get the xml tree - requires several conversions
         tree = etree.fromstring(bytes(responseData, encoding='utf-8'))
        
+        # STATE
         # Get the value for the state 0 = closed, 1 = open
         # <datapoint name="HmIP-RF.001558A99D5A78:1.STATE" type="STATE" ise_id="3622" value="0" valuetype="16" valueunit="""" timestamp="1611044101"/>
-        statevalue = tree.find(".//datapoint[@ise_id='" + self.DatapointsList[DATAPOINTINDEXSTATE] + "']").attrib['value']
-        Domoticz.Debug("Statevalue=" + statevalue)
+        statevalue = tree.find(".//datapoint[@type='" + TYPE_STATE + "']").attrib['value']
+        Domoticz.Debug(TYPE_STATE + "=" + statevalue)
 
         ## update the alert device if raspmatic value not equal domoticz value
         if statevalue != self.State:
             if statevalue == "0":
-                Devices[UNITSTATE].Update( nValue=1, sValue=MSGSTATECLOSED )
+                Devices[UNIT_STATE].Update( nValue=1, sValue=MSGSTATECLOSED )
             if statevalue == "1":
-                Devices[UNITSTATE].Update( nValue=4, sValue=MSGSTATEOPEN )
-            Domoticz.Log("State changed to " + Devices[UNITSTATE].sValue)
-            # Domoticz.Debug("S Update=" + Devices[UNITSTATE].sValue)
+                Devices[UNIT_STATE].Update( nValue=4, sValue=MSGSTATEOPEN )
+            Domoticz.Log(PLUGINSHORTDESCRIPTON + ": State changed to " + Devices[UNIT_STATE].sValue)
+            # Domoticz.Debug("S Update=" + Devices[UNIT_STATE].sValue)
         self.State = statevalue
+
+        # OPERATING_VOLTAGE
+        operatingvoltagevalue = tree.find(".//datapoint[@type='" + TYPE_OPERATING_VOLTAGE + "']").attrib['value']
+        Domoticz.Log(TYPE_OPERATING_VOLTAGE + "=" + operatingvoltagevalue)
         return
         
     def onCommand(self, Unit, Command, Level, Hue):
@@ -225,7 +214,7 @@ class BasePlugin:
                 self.httpConn.Connect()
                 self.httpConnected = 0
             except:
-                Domoticz.Error("[ERROR] Check settings, correct and restart Domoticz.")
+                Domoticz.Error("IP connection failed. Check settings and restart Domoticz.")
         return
         
 global _plugin

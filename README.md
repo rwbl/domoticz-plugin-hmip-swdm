@@ -1,10 +1,9 @@
 # Domoticz Plugin homematicIP Window and Door Contact with magnet (HMIP-SWDM)
-Version see Changelog.
+Domoticz plugin for the homematicIP Window and Door Contact with magnet (HMIP-SWDM).
 
-## Objectives
+# Objectives
 * To monitor the state open / close of windows and doors
-
-![domoticz-plugin-hmip-swdm-o](https://user-images.githubusercontent.com/47274144/105165730-fe5f5200-5b16-11eb-834d-3a098f9361a0.png)
+* To alert via notification in case state is open using Domoticz dzVents script
 
 ## Solution
 To monitor the state open / close of windows and doors the homematicIP Window and Door Contact with magnet (HMIP-SWDM) is used.
@@ -13,16 +12,21 @@ The homematic IP system used is a [RaspberryMatic](https://raspberrymatic.de/) o
 The CCU has the additional software XML-API CCU Addon installed.
 Communication between Domoticz and the CCU is via HTTP XML-API requests with HTTP XML response.
 
-In **Domoticz**, an **Alert** device shows the state of the device closed (green) or open (red).
-The state is updated every 60 seconds (default, can be changed in the hardware settings).
+In Domoticz, following device(s) is/are created:
+(Type,SubType) [XML-API Device Datapoint Type] - Note)
+* Alert (General,Alert) [STATE] - closed (green) or open (red)
+
+The device state is updated every 60 seconds (default).
+
 If required, further actions can defined, by for example creating a dzVents script to send a notification / email (see below "dzVents Example").
 
 ## Hardware
+Hardware subject to change.
 * Raspberry Pi 3B+ (RaspberryMatic System)
 * homematicIP Window and Door Contact with magnet (HMIP-SWDM)
 
 ## Software
-Versions (subject to change) for developing & using this plugin.
+Software versions subject to change.
 * Raspberry Pi OS ( Raspbian GNU/Linux 10 buster, kernel 5.4.83-v7l+)
 * Domoticz 2020.2 (build 12847)
 * RaspberryMatic 3.55.5.20201226 [info](https://raspberrymatic.de/)
@@ -30,11 +34,7 @@ Versions (subject to change) for developing & using this plugin.
 * Python 3.7.3
 * Python module ElementTree
 
-## Prepare
-The RaspberryMatic system has been setup according [these](https://github.com/jens-maus/RaspberryMatic) guidelines.
-The XML-API CCU Addon is required and installed via the HomeMatic WebUI > Settings > Control panel > Additional software (download the latest version from previous URL shared).
-
-### Python Module ElementTree
+**Note on the Python Module ElementTree**
 The Python Module **ElementTree XML API** is used to parse the XML-API response.
 This module is part of the standard package and provides limited support for XPath expressions for locating elements in a tree. 
 
@@ -46,144 +46,46 @@ sudo pip install elementpath
 sudo pip3 install elementpath
 ```
 
-## Installation Plugin
+## RaspberryMatic Prepare
+The RaspberryMatic system has been setup according [these](https://github.com/jens-maus/RaspberryMatic) guidelines.
 
-### Plugin Folder and File
-Each plugin requires a dedicated folder which contains the plugin, mandatory named **plugin.py**.
-``` 
-mkdir /home/pi/domoticz/plugins/hmip-swdm
-``` 
-
-Copy **plugin.py** to the folder hmip-swdm.
-
-### Restart Domoticz
-``` 
-sudo service domoticz.sh restart
-``` 
-
-### Domoticz Add Hardware
+The XML-API CCU Addon is required and installed via the HomeMatic WebUI > Settings > Control panel > Additional software (download the latest version from previous URL shared).
 **IMPORTANT**
-Prior adding the hardware, set in Domoticz GUI > Settings the option to allow new hardware.
-If this option is not enabled, no new devices are created.
-Check the GUI > Setup > Log as error message Python script at the line where the new device is used
-(i.e. Domoticz.Debug("Device created: "+Devices[1].Name))
+Be aware of the security risk, in case the HomeMatic Control Center can be reached via the Internet without special protection (see XML-API Guidelines).
 
-In the GUI > Setup > Hardware add the new hardware **homematicIP Window and Door Contact with Magnet (HmIP-SWDM)**.
-Define the hardware parameter:
-* CCU IP: The IP address of the homematic CCU. Default: 192.168.1.225.
-* Device: The device datapoint ise_id - taken from the XMLAPI statelist request (see below "Get Device Datapoints"). Default: 3597.
-* Datapoint STATE: The STATE datapoint ise_id - taken from the XMLAPI statelist request (see below). Default: 3622.
-* Check Interval (sec): How often the state of the device is checked. Default: 60.
-* Debug: Set initially to true. If the plugin runs fine, update to false.
+### XML-API Scripts
+The XML-API provides various tool scripts, i.e. devices state list, device state or set new value and many more.
+The scripts are submitted via HTTP XML-API requests.
+The plugin makes selective use of scripts with device id and datapoint id's.
+The device id is required to get the state of the device datapoints. The datapoint id's are required to get the state/value of device attributes.
 
-### Add Hardware - Check the Domoticz Log
-After adding, ensure to check the Domoticz Log (GUI > Setup > Log)
-Example - with hardware name C1 (just a name for testing instead using german name "Garagentor")
+#### Device ID (statelist.cgi)
+Get Device ID (attribute "ise_id") from list of all devices with channels and current values: http://ccu-ip-address/addons/xmlapi/statelist.cgi.
+
+From the HTTP XML-API response, the Device ID ("ise_id") is selected by searching for the
+* Device Name (i.e. Garagentor) or 
+* Device Channel (HmIP-SWDM 001558A99D5A78:1). 
+The data is obtained from the HomeMatic WebUI Home page > Status and control > Devices.
+The Device "ise_id" is required for the plugin parameter _Mode1_.
+HTTP XML-API response: Device ID = 3597.
 ```
-2021-01-19 10:25:36.952 Status: Python Plugin System: (C1) Started.
-2021-01-19 10:25:37.208 (C1) Debug logging mask set to: PYTHON PLUGIN QUEUE IMAGE DEVICE CONNECTION MESSAGE ALL
-2021-01-19 10:25:37.208 (C1) 'HardwareID':'13'
-2021-01-19 10:25:37.208 (C1) 'HomeFolder':'/home/pi/domoticz/plugins/hmip-swdm/'
-2021-01-19 10:25:37.208 (C1) 'StartupFolder':'/home/pi/domoticz/'
-2021-01-19 10:25:37.208 (C1) 'UserDataFolder':'/home/pi/domoticz/'
-2021-01-19 10:25:37.208 (C1) 'Database':'/home/pi/domoticz/domoticz.db'
-2021-01-19 10:25:37.208 (C1) 'Language':'en'
-2021-01-19 10:25:37.208 (C1) 'Version':'1.0.0 (Build 20210119)'
-2021-01-19 10:25:37.208 (C1) 'Author':'rwbL'
-2021-01-19 10:25:37.208 (C1) 'Name':'C1'
-2021-01-19 10:25:37.208 (C1) 'Address':'192.168.1.225'
-2021-01-19 10:25:37.208 (C1) 'Port':'0'
-2021-01-19 10:25:37.208 (C1) 'Key':'HmIP-SWDM'
-2021-01-19 10:25:37.208 (C1) 'Mode1':'3597'
-2021-01-19 10:25:37.208 (C1) 'Mode2':'3622'
-2021-01-19 10:25:37.208 (C1) 'Mode5':'60'
-2021-01-19 10:25:37.208 (C1) 'Mode6':'Debug'
-2021-01-19 10:25:37.208 (C1) 'DomoticzVersion':'2020.2 (build 12847)'
-2021-01-19 10:25:37.208 (C1) 'DomoticzHash':'815e12372-modified'
-2021-01-19 10:25:37.208 (C1) 'DomoticzBuildTime':'2021-01-16 14:57:39'
-2021-01-19 10:25:37.208 (C1) Device count: 0
-2021-01-19 10:25:37.208 (C1) Creating new devices ...
-2021-01-19 10:25:37.208 (C1) Creating device 'State'.
-2021-01-19 10:25:37.209 (C1 - State) Updating device from 0:'' to have values 1:'Closed'.
-2021-01-19 10:25:37.215 (C1) Device created: C1 - State
-2021-01-19 10:25:37.215 (C1) Creating new devices: OK
-2021-01-19 10:25:37.215 (C1) Heartbeat set: 60
-2021-01-19 10:25:37.216 Python Plugin System: (C1) Pushing 'PollIntervalDirective' on to queue
-2021-01-19 10:25:37.216 (C1) Datapoints:3622
-2021-01-19 10:25:37.216 (C1) Processing 'PollIntervalDirective' message
-2021-01-19 10:25:37.216 Python Plugin System: (C1) Heartbeat interval set to: 60.
-2021-01-19 10:25:37.207 Status: Python Plugin System: (C1) Entering work loop.
-2021-01-19 10:25:37.207 Status: Python Plugin System: (C1) Initialized version 1.0.0 (Build 20210119), author 'rwbL'
-```
-
-### Domoticz Log Entry with Debug=False
-The plugin runs every 60 seconds (Heartbeat interval).
-```
-2021-01-19 15:54:52.571 (C1) State changed to Open
-2021-01-19 15:55:52.606 (C1) State changed to Closed
-```
-
-## Development Setup
-Information about the plugin development setup and process.
-Development Device:
-* A shared drive Z: pointing to /home/pi/domoticz
-* GUI > Setup > Log
-* GUI > Setup > Hardware
-* GUI > Setup > Devices
-* WinSCP session connected to the Domoticz server (upload files)
-* Putty session connected to the Domoticz server (restarting Domoticz during development)
-
-The various GUI's are required to add the new hardware with its devices and monitor if the plugin code is running without errors.
-
-## Development Iteration
-The development process step used are:
-1. Develop z:\plugins\hmip-swdm\plugin.py
-2. Make changes and save plugin.py
-3. Restart Domoticz from a terminal: sudo service domoticz.sh restart
-4. Wait a moment and refresh GUI > Log
-5. Check the log and fix as required
-
-!IMPORTANT!
-In the **GUI > Setup > Settings**, enable accepting new hardware.
-This is required to add new devices created by the plugin.
-
-## Datapoints
-To communicate between the CCU and Domoticz vv, the ise_id's for devices, channels and datapoint are used (id solution).
-Another option could be to use the name (i.e. name="HmIP-RF.001558A99D5A78:1.STATE") but this requires to obtain the full device state list for every action.
-Tested the name solution, but the communication was rather slow.
-The id soltion is much faster and also more flexible in defining and obtaning information for devices, channels and datapoints.
-
-## Device Datapoint ID
-Steps to obtain the device datapoint id to be able to switch or read the meter data.
-The device datapoint id will be used in the plugin parameter _Mode1_.
-
-### Get Device Channels
-Get the device channels from the HomeMatic WebUI > Status and control > Devices > select name HmIP-SWDM 001558A99D5A78.
-There is one channel:
-* HmIP-SWDM 001558A99D5A78:1
-
-### Get All Devices Statelist
-Submit in a webbrowser the HTTP URL XMLAPI request:
-``` 
-http://ccu-ip/addons/xmlapi/statelist.cgi
-``` 
-The HTTP response is an XML string with the state list for all devices used (can be rather large depending number of devices connected).
-
-### Get Device Datapoints
-In the XML response, search options are either by device name or channel as taken from the Homematic WebUI (Home page > Status and control > Devices).
-* Device Name - the device is named "Garagentor". 
-* Device Channel - there is only one channel HmIP-SWDM 001558A99D5A78:1 which shows the device state open or closed
-
-From the XML-Tree, the datapoints (attribute ise_id) used for the plugin are:
-* 3597 - the device name
-```
+...
 <device name="Garagentor" ise_id="3597" unreach="false" config_pending="false">
+	<channel...>
+</device>
+...
 ```
-* 3622 - the state of the contact defined in the channel HmIP-SWDM 001558A99D5A78:1
-```
-<datapoint name="HmIP-RF.001558A99D5A78:1.STATE" type="STATE" ise_id="3622" value="0" valuetype="16" valueunit="""" timestamp="1611044101" operations="5"/>
-```
-The full device information with the channels 0 and 1 - channel 1 holds the device state by attribute value "0" = closed, "1"= open.
+This script 
+* has to be run once from a browser prior installing the plugin to get the device id as required by the plugin parameter Device ID ("mode1") and the next script.
+* is not used in the plugin.
+
+#### Channel Datapoint(s) (state.cgi)
+Request the Channel Datapoint(s) for a Device ID to get value(s) for selected attribute(s): http://ccu-ip-address/addons/xmlapi/state.cgi?device_id=DEVICE_ISE_ID
+The **Device ID 3597** is used as parameter to get the device state from which the attributes can be selected. 
+The HTTP XML-API response lists three Channels from which **Channel HmIP-SWDM 001558A99D5A78:1** (as previous shown in the HomeMatic WebUI) is used.
+The datapoint(s) used:
+* type="STATE" with ise_id="3622" to get the state of the contact. The value is from valuetype 16, i.e. 1 (open) or 0 (closed).
+The datapoint "ise_id" is required for the plugin parameter _Mode2_.
 ```
 <device name="Garagentor" ise_id="3597" unreach="false" config_pending="false">
 	<channel name="Garagentor:0" ise_id="3598" index="0" visible="true" operate="true">
@@ -203,76 +105,122 @@ The full device information with the channels 0 and 1 - channel 1 holds the devi
 	<channel name="HmIP-SWDM 001558A99D5A78:2" ise_id="3623" index="2" visible="true" operate="true"/>
 </device>
 ```
-The datapoint type="STATE" is used to get the state of the contact via the XML-API script statechange.cgi using the ise_id (i.e. 3622).
-This datapoint id will be used in the plugin parameter _Mode2_.
-The value is from valuetype 16, i.e. 1 or 0.
+This script 
+* has to be run once from a browser prior installing the plugin to get the datapoint id as required by the plugin hardware Datapoint ID STATE ("mode2").
+* is used in the plugin to get the device state in regular check intervals.
+#### Change Value (statechange.cgi)
+Change the State or Value for a Datapoint: http://ccu-ip-address/addons/xmlapi/statechange.cgi?ise_id=DATAPOINT_ISE_ID&new_value=NEW_VALUE
+This script 
+* is not used by the plugin.
 
-### Get Device State
-The url to request the device id datapoints to get the device state uses the XMLAPI scrip state.cgi.
-This url is used in the plugin to get the device state from datapoint ise_id=3622.
-Example url to get the device state:
+#### Summary
+The device id "3597" (for the device named "Garagentor") is used to 
+* get the state "0" (closed") or "1" (open") of the channel "HmIP-SWDM 001558A99D5A78:1" datapoint type "STATE", ise_id "3622". 
+
+## Domoticz Prepare
+Open in a browser, four tabs with the Domoticz GUI Tabs: 
+* Setup > Hardware = to add / delete the new hardware
+* Setup > Devices = to check the devices created by the new hardware (use button Refresh to get the latest values)
+* Setup > Log = to check the installation and check interval cycles for errors
+* Active Menu depending Domoticz Devices created/used = to check the devices value
+Ensure to have the latest Domoticz version installed: Domoticz GUI Tab Setup > Check for Update
+
+### Domoticz Plugin Installation
+
+### Plugin Folder and File
+Each plugin requires a dedicated folder which contains the plugin, mandatory named **plugin.py**.
+The folder is named according omematic IP device name. 
 ``` 
-http://192.168.1.225/addons/xmlapi/state.cgi?device_id=3597
+mkdir /home/pi/domoticz/plugins/hmip-swdm
 ``` 
 
-## Domoticz Devices
-The **Homematic IP Window / Door Contact with magnet** device(s) created.
-Name (TypeName)
-* Alert (Alert)
-Example:
-Idx: 87, Hardware: C1, Name: C1 - State, Type: General, SubType: Alert, Data: Open
+Copy the file **plugin.py** to the folder.
 
-## Plugin Pseudo Code
-Source code (well documented): plugin.py in folder /home/pi/domoticz/plugins/hmip-swdm
-__INIT__
-* set self vars to handle http connection, heartbeat count, datapoints list
-	
-__FIRST TIME__
-* _onStart_ to create the Domoticz Devices
-	
-__NEXT TIME(S)__
-* _onHeardbeat_
-	* create ip connection http with the raspberrymatic szstem
-* _onConnect_
-	* define the data (get,url,headers) to send to the ip connection
-	* send the data and disconnect
-* _onMessage_
-	* parse the xml response
-	* update the alert device with state green (closed) or red (open)
-* _onCommand_
-	* create ip connection which is handled by onConnect
+### Restart Domoticz
+``` 
+sudo service domoticz.sh restart
+``` 
 
-If required, add the devices manually to the Domoticz Dashboard or create a roomplan / floorplan.
+### Domoticz Add Hardware
+**IMPORTANT**
+Prior adding the hardware, set in Domoticz GUI > Settings the option to allow new hardware.
+If this option is not enabled, no new devices are created.
+Check the GUI > Setup > Log as error message Python script at the line where the new device is used
+(i.e. Domoticz.Debug("Device created: "+Devices[1].Name))
 
-## Restart Domoticz
-Restart Domoticz to find the plugin:
+In the GUI > Setup > Hardware add the new hardware **homematicIP Window and Door Contact with Magnet (HmIP-SWDM)**.
+Define the hardware parameter:
+* CCU IP: The IP address of the homematic CCU. Default: 192.168.1.225.
+* Device ID: The device datapoint ise_id - taken from the XMLAPI statelist request. Default: 3597.
+* Datapoint STATE: The STATE datapoint ise_id - taken from the XMLAPI statelist request. Default: 3622.
+* Check Interval (sec): How often the state of the device is checked. Default: 60.
+* Debug: Set initially to true. If the plugin runs fine, update to false.
+
+### Add Hardware - Check the Domoticz Log
+After adding, ensure to check the Domoticz Log (GUI > Setup > Log)
+Example - with hardware name C1 (just a name for testing instead using german name "Garagentor")
 ```
-sudo systemctl restart domoticz.service
+2021-01-25 13:26:15.675 (Garagentor) Debug logging mask set to: PYTHON PLUGIN QUEUE IMAGE DEVICE CONNECTION MESSAGE ALL
+2021-01-25 13:26:15.675 (Garagentor) 'HardwareID':'14'
+2021-01-25 13:26:15.675 (Garagentor) 'HomeFolder':'/home/pi/domoticz/plugins/hmip-swdm/'
+2021-01-25 13:26:15.675 (Garagentor) 'StartupFolder':'/home/pi/domoticz/'
+2021-01-25 13:26:15.675 (Garagentor) 'UserDataFolder':'/home/pi/domoticz/'
+2021-01-25 13:26:15.675 (Garagentor) 'Database':'/home/pi/domoticz/domoticz.db'
+2021-01-25 13:26:15.675 (Garagentor) 'Language':'en'
+2021-01-25 13:26:15.675 (Garagentor) 'Version':'1.1.1 (Build 20210125)'
+2021-01-25 13:26:15.675 (Garagentor) 'Author':'rwbL'
+2021-01-25 13:26:15.675 (Garagentor) 'Name':'Garagentor'
+2021-01-25 13:26:15.675 (Garagentor) 'Address':'192.168.1.225'
+2021-01-25 13:26:15.675 (Garagentor) 'Port':'0'
+2021-01-25 13:26:15.675 (Garagentor) 'Key':'HmIP-SWDM'
+2021-01-25 13:26:15.675 (Garagentor) 'Mode1':'3597'
+2021-01-25 13:26:15.675 (Garagentor) 'Mode5':'60'
+2021-01-25 13:26:15.675 (Garagentor) 'Mode6':'Debug'
+2021-01-25 13:26:15.675 (Garagentor) 'DomoticzVersion':'2020.2 (build 12883)'
+2021-01-25 13:26:15.675 (Garagentor) 'DomoticzHash':'1a7e11b7d-modified'
+2021-01-25 13:26:15.675 (Garagentor) 'DomoticzBuildTime':'2021-01-24 08:48:01'
+2021-01-25 13:26:15.675 (Garagentor) Device count: 0
+2021-01-25 13:26:15.675 (Garagentor) Creating new devices ...
+2021-01-25 13:26:15.675 (Garagentor) Creating device 'State'.
+2021-01-25 13:26:15.676 (Garagentor - State) Updating device from 0:'' to have values 1:'Closed'.
+2021-01-25 13:26:15.683 (Garagentor) Device created: Garagentor - State
+2021-01-25 13:26:15.683 (Garagentor) Creating new devices: OK
+2021-01-25 13:26:15.683 (Garagentor) Heartbeat set: 60
+2021-01-25 13:26:15.683 Python Plugin System: (Garagentor) Pushing 'PollIntervalDirective' on to queue
+2021-01-25 13:26:15.683 (Garagentor) Processing 'PollIntervalDirective' message
+2021-01-25 13:26:15.683 Python Plugin System: (Garagentor) Heartbeat interval set to: 60.
+2021-01-25 13:26:15.386 Status: Python Plugin System: (Garagentor) Started.
+2021-01-25 13:26:15.673 Status: Python Plugin System: (Garagentor) Entering work loop.
+2021-01-25 13:26:15.674 Status: Python Plugin System: (Garagentor) Initialized version 1.1.1 (Build 20210125), author 'rwbL'
 ```
 
-**Note**
-When making changes to the Python plugin code, ensure to restart Domoticz and refresh any of the Domoticz Web UI's.
-This is the iteration process during development - build the solution step-by-step.
+### Domoticz Device List
+Idx, Hardware, Name, Type, SubType, Data
+80, Garagentor, State, General, Alert, Closed
 
-## dzVents Example
+### Domoticz Log Entry with Debug=False
+The plugin runs every 60 seconds (Heartbeat interval).
+```
+2021-01-25 13:26:25.829 (Garagentor) HMIP-SWDM: State changed to Closed
+2021-01-25 13:26:25.829 (Garagentor) OPERATING_VOLTAGE=2.700000
+```
+
+```
+2021-01-25 13:29:25.871 (Garagentor) HMIP-SWDM: State changed to Open
+2021-01-25 13:29:25.871 (Garagentor) OPERATING_VOLTAGE=2.700000
+```
+
+## Domoticz dzVents Script alert_window-door-contact
+This is an example on how to alert via email
 ```
 --[[
     alert_window-door-contact.dzvents
     Window-Door-Contact (homematicIP device HmIP-SWDM) Alert Example.
     Send notification if the level of the Alert device changes to 4 (RED).
-    Domoticz log example for the Alert device name "C1":
-        2021-01-20 09:26:28.773 Notification sent (browser) => Success
-        2021-01-20 09:26:28.736 Status: dzVents: Info: Handling events for: "C1 - State", value: "Open"
-        2021-01-20 09:26:28.736 Status: dzVents: Info: ------ Start internal script: alert_window-door-contact: Device: "C1 - State (C1)", Index: 87
-        2021-01-20 09:26:28.736 Status: dzVents: Info: Device C1 - State state changed to Open (4).
-        2021-01-20 09:26:28.736 Status: dzVents: Info: ------ Finished alert_window-door-contact
-        2021-01-20 09:26:28.736 Status: EventSystem: Script event triggered: /home/pi/domoticz/dzVents/runtime/dzVents.lua
-        2021-01-20 09:26:28.772 Status: Notification: SECURITY ALERT
-        2021-01-20 09:26:29.546 Notification sent (email) => Success
     20210120 rwbl
 ]]--
 
-local IDX_WINDOWDOORCONTACT = 87;   -- Type General, SubType Alert
+local IDX_WINDOWDOORCONTACT = 80;   -- Type General, SubType Alert
 
 local STATE_CLOSED = 1;             -- Alert level 1 GREEN
 local STATE_OPEN = 4;               -- Alert level 4 RED
@@ -288,7 +236,7 @@ return {
 		if device.nValue == STATE_OPEN then
             -- Send notification via email
             local subject = ('SECURITY ALERT'):format()
-            local message = ('Window-Door-Contact %s state changed to %s.'):format(device.name, device.sValue)
+            local message = ('Window-Door-Contact Garagentor %s changed to %s.'):format(device.name, device.sValue)
             domoticz.notify(subject, message, domoticz.PRIORITY_HIGH)
         end
 	end
