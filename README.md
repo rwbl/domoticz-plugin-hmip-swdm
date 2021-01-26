@@ -5,6 +5,8 @@ Domoticz plugin for the homematicIP Window and Door Contact with magnet (HMIP-SW
 * To monitor the state open / close of windows and doors
 * To alert via notification in case state is open using Domoticz dzVents script
 
+![domoticz-plugin-hmip-swdm-o](https://user-images.githubusercontent.com/47274144/105820917-79fb4c00-5fba-11eb-8acc-da71fd4bb98a.png)
+
 ## Solution
 To monitor the state open / close of windows and doors the homematicIP Window and Door Contact with magnet (HMIP-SWDM) is used.
 The HMIP-SWDM is connected to a homematic IP system.
